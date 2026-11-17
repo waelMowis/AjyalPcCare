@@ -39,6 +39,7 @@ public sealed partial class MainForm : Form
             ["memory"] = ("الذاكرة", () => new MemoryPage()),
             ["cleanup"] = ("تنظيف الملفات", () => new CleanupPage()),
             ["startup"] = ("بدء التشغيل", () => new StartupPage()),
+            ["uninstall"] = ("إلغاء التثبيت", () => new UninstallPage()),
             ["health"] = ("صحة الجهاز", () => new HealthPage()),
             ["lab"] = ("وضع المعامل", () => new LabPage()),
             ["history"] = ("السجل والتراجع", () => new HistoryPage())

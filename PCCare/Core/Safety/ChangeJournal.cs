@@ -8,7 +8,11 @@ public enum UndoKind
     None,
     StartupApproved,
     ScheduledTask,
-    ServiceStartType
+    ServiceStartType,
+    /// <summary>نسخة .reg — الرجوع: reg import (بقايا البرامج: مفاتيح/قيم/خدمات).</summary>
+    RegistryImport,
+    /// <summary>نسخة XML لمهمة مجدولة — الرجوع: Register-ScheduledTask.</summary>
+    ScheduledTaskXml
 }
 
 /// <summary>سجل تغيير واحد مع بيانات التراجع.</summary>

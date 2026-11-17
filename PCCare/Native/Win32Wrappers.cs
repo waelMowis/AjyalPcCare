@@ -188,6 +188,25 @@ public static class RecycleBinApi
         return hr == 0 ? (info.i64Size, info.i64NumItems) : (0, 0);
     }
 
+    /// <summary>
+    /// نقل ملف أو فولدر لسلة المحذوفات (قابل للاسترجاع) بدل المسح النهائي.
+    /// لو العنصر أكبر من مساحة السلة، ويندوز بيسأل قبل ما يمسحه نهائي (FOF_WANTNUKEWARNING).
+    /// </summary>
+    public static NativeResult SendToRecycleBin(string path)
+    {
+        var op = new NativeMethods.SHFILEOPSTRUCT
+        {
+            hwnd = IntPtr.Zero,
+            wFunc = NativeMethods.FO_DELETE,
+            pFrom = path.TrimEnd('\\') + "\0", // لازم ينتهي بـ null مزدوج (الـ marshaller بيضيف التاني)
+            fFlags = (ushort)(NativeMethods.FOF_ALLOWUNDO | NativeMethods.FOF_NOCONFIRMATION | NativeMethods.FOF_SILENT |
+                              NativeMethods.FOF_NOERRORUI | NativeMethods.FOF_WANTNUKEWARNING)
+        };
+        int rc = NativeMethods.SHFileOperationW(ref op);
+        if (rc == 0 && !op.fAnyOperationsAborted) return NativeResult.Ok("اتنقل لسلة المحذوفات");
+        return NativeResult.Fail(op.fAnyOperationsAborted ? "اتلغى (غالبًا الملف أكبر من مساحة السلة ورفضت المسح النهائي)" : $"SHFileOperation رجّع 0x{rc:X} (غالبًا ملف مفتوح أو مستخدم)", rc);
+    }
+
     public static NativeResult Empty()
     {
         int hr = NativeMethods.SHEmptyRecycleBinW(IntPtr.Zero, null,

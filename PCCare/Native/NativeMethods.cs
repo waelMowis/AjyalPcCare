@@ -171,6 +171,30 @@ internal static partial class NativeMethods
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     internal static extern int SHEmptyRecycleBinW(IntPtr hwnd, string? rootPath, uint flags);
 
+    internal const uint FO_DELETE = 0x0003;
+    internal const ushort FOF_SILENT = 0x0004;
+    internal const ushort FOF_NOCONFIRMATION = 0x0010;
+    internal const ushort FOF_ALLOWUNDO = 0x0040;
+    internal const ushort FOF_NOERRORUI = 0x0400;
+    internal const ushort FOF_WANTNUKEWARNING = 0x4000;
+
+    /// <summary>SHFILEOPSTRUCTW — على x64 بالمحاذاة الافتراضية (Pack=1 على 32-بت بس).</summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct SHFILEOPSTRUCT
+    {
+        public IntPtr hwnd;
+        public uint wFunc;
+        public string pFrom;
+        public string? pTo;
+        public ushort fFlags;
+        [MarshalAs(UnmanagedType.Bool)] public bool fAnyOperationsAborted;
+        public IntPtr hNameMappings;
+        public string? lpszProgressTitle;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int SHFileOperationW(ref SHFILEOPSTRUCT op);
+
     // ================= wintrust =================
 
     internal static readonly Guid WINTRUST_ACTION_GENERIC_VERIFY_V2 = new("00AAC56B-CD44-11d0-8CC2-00C04FC295EE");

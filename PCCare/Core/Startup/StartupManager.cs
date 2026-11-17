@@ -172,6 +172,18 @@ public static class StartupManager
                     r = ok ? new ToggleResult(true, "تم التراجع") : new ToggleResult(false, "فشل إرجاع نوع التشغيل");
                     break;
                 }
+                case UndoKind.RegistryImport:
+                {
+                    bool ok = await Uninstall.LeftoverRemover.UndoRegistryImportAsync(record.UndoData["File"], ct).ConfigureAwait(false);
+                    r = ok ? new ToggleResult(true, "اترجع من النسخة الاحتياطية") : new ToggleResult(false, "تعذر استيراد النسخة الاحتياطية (الملف اتمسح؟)");
+                    break;
+                }
+                case UndoKind.ScheduledTaskXml:
+                {
+                    bool ok = await Uninstall.LeftoverRemover.UndoScheduledTaskAsync(record.UndoData["File"], record.UndoData["TaskPath"], record.UndoData["TaskName"], ct).ConfigureAwait(false);
+                    r = ok ? new ToggleResult(true, "المهمة اترجعت") : new ToggleResult(false, "تعذر إرجاع المهمة");
+                    break;
+                }
                 default:
                     r = new ToggleResult(false, "نوع غير مدعوم");
                     break;
