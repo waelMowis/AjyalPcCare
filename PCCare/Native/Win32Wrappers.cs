@@ -88,6 +88,19 @@ public static class MemoryApi
     /// يفضّي الـ Standby List. ملحوظة تقنية: ده بيمسح كاش مفيد — البرامج اللي هتتفتح بعده هتتقرا من الديسك.
     /// lowPriorityOnly = true يمسح أولوية 0 بس (أقل ضرر).
     /// </summary>
+    /// <summary>
+    /// كتابة الصفحات المعدّلة (Modified) على الديسك — بتتحول Standby (قابلة للتفريغ).
+    /// آمنة: نفس اللي ويندوز بيعمله لوحده، بس بدري.
+    /// </summary>
+    public static NativeResult FlushModifiedList()
+    {
+        var priv = PrivilegeApi.TryEnable(PrivilegeApi.SeProfileSingleProcess);
+        if (!priv.Success) return priv;
+        int command = NativeMethods.MemoryFlushModifiedList;
+        int status = NativeMethods.NtSetSystemInformation(NativeMethods.SystemMemoryListInformation, ref command, sizeof(int));
+        return status == 0 ? NativeResult.Ok("اتكتبت الصفحات المعدّلة") : NativeResult.Fail($"NTSTATUS 0x{status:X8}", status);
+    }
+
     public static NativeResult PurgeStandbyList(bool lowPriorityOnly = false)
     {
         var priv = PrivilegeApi.TryEnable(PrivilegeApi.SeProfileSingleProcess);
@@ -98,6 +111,18 @@ public static class MemoryApi
         return status == 0
             ? NativeResult.Ok("تم تفريغ قائمة Standby")
             : NativeResult.Fail($"NtSetSystemInformation رجّع NTSTATUS 0x{status:X8}", status);
+    }
+}
+
+public static class ForegroundApi
+{
+    /// <summary>PID البرنامج اللي المستخدم شغال عليه دلوقتي (النافذة اللي في المقدمة).</summary>
+    public static int? ForegroundProcessId()
+    {
+        var h = NativeMethods.GetForegroundWindow();
+        if (h == IntPtr.Zero) return null;
+        NativeMethods.GetWindowThreadProcessId(h, out uint pid);
+        return pid == 0 ? null : (int)pid;
     }
 }
 

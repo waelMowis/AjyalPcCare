@@ -57,6 +57,9 @@ public sealed class MemorySettings
 
     /// <summary>تفريغ الأولوية المنخفضة بس (أقل ضرر على الكاش المهم).</summary>
     public bool LowPriorityOnly { get; set; }
+
+    /// <summary>"نظّف الذاكرة الآن": تقليص البرامج الخاملة كمان (مقفول افتراضيًا).</summary>
+    public bool OptimizeTrimIdle { get; set; }
 }
 
 public sealed class LeakDetectionSettings

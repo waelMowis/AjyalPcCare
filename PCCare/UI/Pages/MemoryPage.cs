@@ -10,11 +10,16 @@ namespace AjyalPcCare.UI.Pages;
 public sealed class MemoryPage : PageBase
 {
     public override string PageTitle => "إدارة الذاكرة";
-    public override string PageDescription => "أدوات حقيقية بأثر مقاس — ومن غير أي تفريغ أعمى";
+    public override string PageDescription => "تنظيف بضغطة واحدة بأرقام حقيقية قبل وبعد — وتنظيف تلقائي وقت ما الذاكرة الفاضية تقل";
 
     private readonly Label _free, _standby, _modified, _commit, _available, _byPriority;
-    private readonly Label _lastResult = Ui.Label("", UiTheme.Bold, UiTheme.Success);
-    private readonly CheckBox _autoEnabled = new() { Text = "تفعيل التفريغ التلقائي المشروط", AutoSize = true };
+    private readonly Label _lastResult = Ui.Note("", UiTheme.Success, UiTheme.Bold);
+    private readonly Label _inUseNow, _freeNow, _standbyNow;
+    private readonly Button _cleanBtn;
+    private readonly CheckBox _optStandby = new() { Text = "تفريغ الكاش (Standby) — بيزوّد الذاكرة الفاضية فعلًا", Checked = true, AutoSize = true };
+    private readonly CheckBox _optModified = new() { Text = "كتابة الصفحات المعدّلة (Modified) على الديسك — آمن", Checked = true, AutoSize = true };
+    private readonly CheckBox _optTrim = new() { Text = "تقليص البرامج الخاملة في الخلفية — بينزّل نسبة \"المستخدم\" (البرنامج اللي تفتحه بعدها يبطّأ لحظة)", AutoSize = true };
+    private readonly CheckBox _autoEnabled = new() { Text = "شغّل التنظيف التلقائي (لما الذاكرة الفاضية تقل عن الحد)", AutoSize = true };
     private readonly NumericUpDown _freeThreshold = new() { Minimum = 64, Maximum = 262144, Increment = 128, Width = 110 };
     private readonly NumericUpDown _standbyMin = new() { Minimum = 0, Maximum = 262144, Increment = 128, Width = 110 };
     private readonly NumericUpDown _cooldown = new() { Minimum = 30, Maximum = 86400, Increment = 30, Width = 110 };
@@ -25,13 +30,32 @@ public sealed class MemoryPage : PageBase
     private readonly DataGridView _leakGrid = Ui.Grid();
     private readonly List<Button> _adminButtons = [];
     private bool _active;
+    private bool _loadingSettings;
 
     public MemoryPage()
     {
-        var explain = new FlowCard("ليه \"تنظيف الرام\" غالبًا مش هو الحل؟");
+        // ========== 1) نظّف الذاكرة الآن (أول حاجة في الصفحة) ==========
+        _cleanBtn = Ui.Button("🧹  نظّف الذاكرة الآن", true, async (_, _) => await CleanNowAsync());
+        _cleanBtn.Font = UiTheme.Subtitle;
+        _cleanBtn.MinimumSize = new Size(UiTheme.Px(240), Measure.LineHeight(UiTheme.Subtitle) + UiTheme.Px(22));
+        _adminButtons.Add(_cleanBtn);
+        var clean = new FlowCard("نظّف الذاكرة الآن");
+        _inUseNow = clean.AddField("المستخدم فعليًا (زي Task Manager)");
+        _freeNow = clean.AddField("الفاضية فعليًا (Free)");
+        _standbyNow = clean.AddField("الكاش (Standby)");
+        clean.AddButtons(_cleanBtn);
+        clean.Add(_optStandby);
+        clean.Add(_optModified);
+        clean.Add(_optTrim);
+        clean.Add(_lastResult);
+        clean.Add(Ui.Note("ملحوظة صريحة: الكاش (Standby) مش محسوب أصلًا في نسبة \"المستخدم\" — فتفريغه بيزوّد الفاضي بس ومابينزّلش النسبة. " +
+                          "النسبة بتنزل بس مع \"تقليص البرامج الخاملة\". وويندوز بيملا الكاش تاني مع الاستخدام، وده طبيعي ومفيد.", UiTheme.Muted, UiTheme.Small));
+        _optTrim.Checked = SettingsStore.Current.Memory.OptimizeTrimIdle;
+
+        var explain = new FlowCard("ليه الأرقام بتتصرف كده؟");
         explain.Add(Ui.Label(MemoryManager.ExplanationText));
 
-        var state = new FlowCard("حالة الذاكرة الآن");
+        var state = new FlowCard("تفاصيل الذاكرة");
         _available = state.AddField("المتاح لأي برنامج (Free + Standby)");
         _free = state.AddField("فارغة فعليًا (Free + Zeroed)");
         _standby = state.AddField("Standby (كاش قابل للاسترداد فورًا)");
@@ -39,25 +63,18 @@ public sealed class MemoryPage : PageBase
         _modified = state.AddField("Modified (لازم يتكتب على الديسك قبل استخدامه)");
         _commit = state.AddField("Commit (الضغط الحقيقي)");
 
-        var purgeFull = Ui.Button("تفريغ Standby (كامل)", false, (_, _) => Purge(false));
-        var purgeLow = Ui.Button("تفريغ الأولوية المنخفضة فقط", false, (_, _) => Purge(true));
-        _adminButtons.Add(purgeFull);
-        _adminButtons.Add(purgeLow);
-        var manual = new FlowCard("تفريغ يدوي");
-        manual.Add(Ui.Label("استخدمه فقط لو برنامج معين بيعلق لما الـ Free يقل، أو لاختبار. النتيجة اللي هتظهر مقاسة قبل وبعد.", UiTheme.Base, UiTheme.Muted));
-        manual.AddButtons(purgeFull, purgeLow);
-        manual.Add(_lastResult);
-
-        var auto = new FlowCard("التفريغ التلقائي المشروط (فكرة ISLC)");
-        auto.Add(Ui.Label("بيتنفذ فقط لو الشرطين اتحققوا مع بعض: الذاكرة الفارغة أقل من الحد، والـ Standby أكبر من الحد — ومع فترة تهدئة بين كل مرة.", UiTheme.Base, UiTheme.Muted));
+        // ========== 2) التنظيف التلقائي — التعليم بيشتغل فورًا ==========
+        var auto = new FlowCard("التنظيف التلقائي");
         auto.Add(_autoEnabled);
+        auto.Add(_autoStatus);
+        auto.Add(Ui.Note("بيفرّغ الكاش لوحده لما الشرطين يتحققوا مع بعض: الذاكرة الفاضية أقل من الحد، والكاش أكبر من الحد — ومع فترة تهدئة بين كل مرة. " +
+                         "الإعدادات دي مناسبة لأغلب الأجهزة، ولو غيّرتها دوس \"حفظ\".", UiTheme.Muted));
         auto.AddButtons(Ui.Label("نفّذ لو Free أقل من (م.ب):"), _freeThreshold, Ui.Label("و Standby أكبر من (م.ب):"), _standbyMin);
         auto.AddButtons(Ui.Label("فترة التهدئة (ثانية):"), _cooldown, Ui.Label("الفحص كل (ثانية):"), _interval);
         auto.Add(_lowOnly);
-        var saveAuto = Ui.Button("حفظ وتطبيق", true, (_, _) => SaveAuto());
+        var saveAuto = Ui.Button("حفظ الإعدادات", false, (_, _) => SaveAuto());
         _adminButtons.Add(saveAuto);
         auto.AddButtons(saveAuto);
-        auto.Add(_autoStatus);
 
         var procCard = new Card("تقليص Working Set لبروسيس واحد") { Height = 380 };
         _procGrid.Columns.AddRange(
@@ -87,9 +104,17 @@ public sealed class MemoryPage : PageBase
         leakCard.AddContent(Ui.Label($"الشرط: Private Bytes بتزيد في {ls.IncreasingRatio:P0} من العينات على مدار {ls.WindowSamples} عينة (كل {ls.SampleIntervalSeconds} ث) وبزيادة ≥ {ls.MinGrowthMb} م.ب. ده اشتباه مش حكم.", UiTheme.Small, UiTheme.Muted));
         leakCard.AddContent(_leakGrid);
 
-        Stack(explain, state, manual, auto, procCard, leakCard);
+        Stack(clean, auto, state, procCard, leakCard, explain);
 
         LoadAutoSettings();
+        // التعليم على التنظيف التلقائي بيشتغل/يقف فورًا (من غير زرار حفظ)
+        _autoEnabled.CheckedChanged += (_, _) => { if (!_loadingSettings) SaveAuto(); };
+        _optTrim.CheckedChanged += (_, _) =>
+        {
+            var st = SettingsStore.Current;
+            st.Memory.OptimizeTrimIdle = _optTrim.Checked;
+            SettingsStore.TrySave(st);
+        };
         AppServices.Instance.Updated += OnUpdate;
         AppServices.Instance.AutoPurge.Purged += OnAutoPurged;
         Disposed += (_, _) =>
@@ -127,6 +152,16 @@ public sealed class MemoryPage : PageBase
     private void RenderLists()
     {
         var snap = AppServices.Instance.Last?.Snapshot;
+        if (snap?.Memory is { } mm)
+        {
+            _inUseNow.Text = $"{Format.Bytes(snap.UsedPhysical)} من {Format.Bytes(mm.TotalPhysical)} ({snap.MemoryPercent:0}%)";
+            _inUseNow.ForeColor = snap.MemoryPercent >= 90 ? UiTheme.Danger : snap.MemoryPercent >= 75 ? UiTheme.Warning : UiTheme.Text;
+        }
+        if (snap?.Lists is { } ll)
+        {
+            _freeNow.Text = Format.Bytes(ll.Free + ll.Zeroed);
+            _standbyNow.Text = Format.Bytes(ll.Standby);
+        }
         if (snap?.Memory is { } m)
         {
             _available.Text = Format.Bytes(m.AvailablePhysical);
@@ -146,34 +181,44 @@ public sealed class MemoryPage : PageBase
         }
     }
 
-    private void Purge(bool lowOnly)
+    private async Task CleanNowAsync()
     {
         if (!RequireAdmin()) return;
-        if (!Dialogs.Confirm(FindForm(),
-                "تفريغ Standby بيمسح كاش مفيد، والبرامج اللي هتفتحها بعده ممكن تفتح أبطأ شوية.\n\nمتأكد إنك عايز تكمل؟", "تأكيد التفريغ", true))
-            return;
-
-        _ = RunGuardedAsync(async _ =>
+        if (!_optStandby.Checked && !_optModified.Checked && !_optTrim.Checked)
         {
-            var outcome = await Task.Run(() => MemoryManager.PurgeStandby(lowOnly, "يدوي"));
-            if (outcome.Success)
+            Dialogs.Info(FindForm(), "اختار حاجة واحدة على الأقل من الاختيارات.");
+            return;
+        }
+
+        await RunGuardedAsync(async ct =>
+        {
+            _lastResult.ForeColor = UiTheme.Muted;
+            _lastResult.Text = "بنضّف...";
+            var options = new OptimizeOptions
             {
-                _lastResult.ForeColor = UiTheme.Success;
-                _lastResult.Text = outcome.Before is null || outcome.After is null
-                    ? "تم التفريغ"
-                    : $"تم — الذاكرة الفارغة زادت {Format.Bytes(Math.Max(0, outcome.FreeGained))} (Standby: {Format.Bytes(outcome.Before.Standby)} ← {Format.Bytes(outcome.After.Standby)})";
-            }
-            else
+                PurgeStandby = _optStandby.Checked,
+                FlushModified = _optModified.Checked,
+                TrimIdleProcesses = _optTrim.Checked
+            };
+            var r = await MemoryOptimizer.OptimizeAsync(options, AppServices.Instance.Last?.Processes, ct);
+
+            var lines = new List<string>
             {
-                _lastResult.ForeColor = UiTheme.Danger;
-                _lastResult.Text = "فشل: " + outcome.Message;
-            }
+                $"✓ الفاضية: {Format.Bytes(r.Before.Free)} ← {Format.Bytes(r.After.Free)}  (+{Format.Bytes(Math.Max(0, r.FreeGained))})",
+                $"المستخدم فعليًا: {Format.Bytes(r.Before.InUse)} ({r.Before.InUsePercent:0}%) ← {Format.Bytes(r.After.InUse)} ({r.After.InUsePercent:0}%)" +
+                    (r.InUseReduced > 0 ? $"  (−{Format.Bytes(r.InUseReduced)})" : "")
+            };
+            lines.AddRange(r.Steps);
+            lines.AddRange(r.Errors.Select(e => "✖ " + e));
+            _lastResult.ForeColor = r.Errors.Count == 0 ? UiTheme.Success : UiTheme.Warning;
+            _lastResult.Text = string.Join("\n", lines);
             RenderLists();
-        });
+        }, busy => _cleanBtn.Enabled = !busy && AppEnvironment.IsAdministrator);
     }
 
     private void LoadAutoSettings()
     {
+        _loadingSettings = true;
         var m = SettingsStore.Current.Memory;
         _autoEnabled.Checked = m.AutoPurgeEnabled;
         _freeThreshold.Value = Math.Clamp(m.FreeMemoryThresholdMb, (int)_freeThreshold.Minimum, (int)_freeThreshold.Maximum);
@@ -181,6 +226,7 @@ public sealed class MemoryPage : PageBase
         _cooldown.Value = Math.Clamp(m.CooldownSeconds, (int)_cooldown.Minimum, (int)_cooldown.Maximum);
         _interval.Value = Math.Clamp(m.CheckIntervalSeconds, (int)_interval.Minimum, (int)_interval.Maximum);
         _lowOnly.Checked = m.LowPriorityOnly;
+        _loadingSettings = false;
     }
 
     private void SaveAuto()

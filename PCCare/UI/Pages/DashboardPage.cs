@@ -1,5 +1,6 @@
 using AjyalPcCare.Core.Common;
 using AjyalPcCare.Core.Health;
+using AjyalPcCare.Core.Memory;
 using AjyalPcCare.Core.Monitoring;
 using AjyalPcCare.UI.Controls;
 using AjyalPcCare.UI.Services;
@@ -26,6 +27,8 @@ public sealed class DashboardPage : PageBase
     private readonly Label _grade = Ui.Note("اضغط \"احسب المؤشر\"", UiTheme.Text, UiTheme.Subtitle);
     private readonly Label _findings = Ui.Note("");
     private readonly Button _calcBtn;
+    private readonly Button _cleanMemBtn;
+    private readonly Label _cleanResult = Ui.Note("", UiTheme.Success, UiTheme.Bold);
 
     private readonly DataGridView _grid = Ui.Grid();
     private readonly RadioButton _byMem = new() { Text = "ترتيب حسب الذاكرة", Checked = true, AutoSize = true, Margin = new Padding(8, 4, 8, 4) };
@@ -55,6 +58,11 @@ public sealed class DashboardPage : PageBase
         _mFree = memCard.AddField("فارغة فعليًا");
         _mCommit = memCard.AddField("Commit (الضغط الحقيقي)");
         _mProc = memCard.AddField("البروسيسات / Threads");
+        _cleanMemBtn = Ui.Button("🧹 نظّف الذاكرة", true, async (_, _) => await CleanMemoryAsync());
+        _cleanMemBtn.Enabled = AppEnvironment.IsAdministrator;
+        memCard.AddButtons(_cleanMemBtn, Ui.Button("خيارات أكتر ←", false, (_, _) => (FindForm() as MainForm)?.Navigate("memory")));
+        memCard.Add(_cleanResult);
+        _cleanResult.Visible = false;
         memCard.Add(Ui.Note("Standby = كاش مفيد بيتنازل عنه ويندوز فورًا لأي برنامج محتاجه — مش ذاكرة مهدرة. المؤشر الحقيقي للضغط هو Commit.", UiTheme.Muted, UiTheme.Small));
 
         // مؤشر الصحة
@@ -173,6 +181,20 @@ public sealed class DashboardPage : PageBase
         foreach (var p in top)
             _grid.Rows.Add(p.Name, p.Pid, p.CpuPercent.ToString("0.0"), Format.Bytes(p.PrivateBytes), Format.Bytes(p.WorkingSet), p.Publisher ?? "—", p.Path ?? "(محمي)");
         _grid.ResumeLayout();
+    }
+
+    private async Task CleanMemoryAsync()
+    {
+        await RunGuardedAsync(async ct =>
+        {
+            var options = new OptimizeOptions { TrimIdleProcesses = SettingsStore.Current.Memory.OptimizeTrimIdle };
+            var r = await MemoryOptimizer.OptimizeAsync(options, AppServices.Instance.Last?.Processes, ct);
+            _cleanResult.Visible = true;
+            _cleanResult.ForeColor = r.Errors.Count == 0 ? UiTheme.Success : UiTheme.Warning;
+            _cleanResult.Text = $"✓ الفاضية زادت {Format.Bytes(Math.Max(0, r.FreeGained))}" +
+                                (r.InUseReduced > 0 ? $" — المستخدم قلّ {Format.Bytes(r.InUseReduced)}" : "") +
+                                (r.Errors.Count > 0 ? " — " + string.Join("، ", r.Errors) : "");
+        }, busy => _cleanMemBtn.Enabled = !busy && AppEnvironment.IsAdministrator);
     }
 
     private async Task CalculateHealthAsync()

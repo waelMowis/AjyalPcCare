@@ -61,6 +61,12 @@ internal static partial class NativeMethods
     [DllImport("kernel32.dll")]
     internal static extern uint GetOEMCP();
 
+    [DllImport("user32.dll")]
+    internal static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    internal static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
     // ================= psapi =================
 
     [StructLayout(LayoutKind.Sequential)]
@@ -95,6 +101,7 @@ internal static partial class NativeMethods
     internal const int SystemMemoryListInformation = 80;
     internal const int MemoryPurgeStandbyList = 4;
     internal const int MemoryPurgeLowPriorityStandbyList = 5;
+    internal const int MemoryFlushModifiedList = 3;
 
     /// <summary>SYSTEM_MEMORY_LIST_INFORMATION — الأحجام بالـ Pages.</summary>
     [StructLayout(LayoutKind.Sequential)]
