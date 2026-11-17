@@ -1,0 +1,19 @@
+# مخرجات البناء
+bin/
+obj/
+publish/
+smoke/
+installer/Output/
+Releases/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+
+# بيانات التشغيل (لو البرنامج اشتغل من فولدر المشروع) — متترفعش أبدًا
+logs/
+reports/
+changes.json
+*.broken*

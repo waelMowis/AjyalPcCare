@@ -1,0 +1,56 @@
+{
+  "Ui": {
+    "FontName": "Readex Pro",
+    "FallbackFontName": "Segoe UI",
+    "FontSize": 10,
+    "RefreshIntervalMs": 1000
+  },
+  "Memory": {
+    "AutoPurgeEnabled": false,
+    "FreeMemoryThresholdMb": 1024,
+    "StandbyMinimumMb": 1024,
+    "CheckIntervalSeconds": 10,
+    "CooldownSeconds": 300,
+    "LowPriorityOnly": false
+  },
+  "LeakDetection": {
+    "Enabled": true,
+    "SampleIntervalSeconds": 30,
+    "WindowSamples": 20,
+    "MinGrowthMb": 200,
+    "IncreasingRatio": 0.8
+  },
+  "Cleanup": {
+    "MinFileAgeHours": 24,
+    "AllUserProfiles": true,
+    "DefaultCategories": [
+      "UserTemp",
+      "WindowsTemp",
+      "RecycleBin",
+      "CrashDumps"
+    ],
+    "ExcludedPaths": []
+  },
+  "Health": {
+    "UptimeWarningDays": 7,
+    "LowDiskPercent": 15,
+    "CriticalDiskPercent": 5,
+    "StartupWarningCount": 10
+  },
+  "Lab": {
+    "ReportFolder": "",
+    "ScheduleDay": "Friday",
+    "ScheduleTime": "14:00",
+    "CleanCategories": [
+      "UserTemp",
+      "WindowsTemp",
+      "BrowserCache",
+      "RecycleBin",
+      "CrashDumps"
+    ],
+    "PurgeStandby": false,
+    "OptimizeDrives": false,
+    "RunDism": false
+  },
+  "LogRetentionDays": 30
+}

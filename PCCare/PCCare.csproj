@@ -1,0 +1,130 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    AJYAL PC Care — مشروع واحد بس.
+    الفصل المعماري بالفولدرات:
+      Native\  كل P/Invoke (مفيش أي ملف تاني بيعمل DllImport)
+      Core\    المنطق كله — ممنوع يستخدم أي حاجة من WinForms
+      Cli\     الوضع الصامت (سطر الأوامر)
+      UI\      الواجهة
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+
+    <AssemblyName>PCCare</AssemblyName>
+    <RootNamespace>AjyalPcCare</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+
+    <Product>AJYAL PC Care</Product>
+    <Company>مدارس أجيال اليرموك الأهلية</Company>
+    <Authors>د. وائل عويس (Dr. Wael Owais)</Authors>
+    <Copyright>© 2026 د. وائل عويس</Copyright>
+    <Description>AJYAL PC Care — صيانة وتسريع أجهزة المعامل والموظفين. تطوير د. وائل عويس</Description>
+
+    <!-- أول رقمين من الإصدار. التالت = رقم النشر الرسمي على GitHub (شوف PcStampVersion تحت) -->
+    <PcBaseVersion>1.0</PcBaseVersion>
+    <Version>$(PcBaseVersion).0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+    <!-- من غير فولدرات لغات (cs, de, fr ...) جنب الـ exe -->
+    <SatelliteResourceLanguages>ar;en</SatelliteResourceLanguages>
+    <!-- الـ pdb جوه الـ exe: أرقام السطور في اللوج من غير ملفات زيادة -->
+    <DebugType>embedded</DebugType>
+    <!-- الواجهة مبنية بالكود (من غير Designer) -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
+
+    <PcRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))</PcRoot>
+    <PcReleasesRoot>$(PcRoot)\Releases</PcReleasesRoot>
+
+    <!-- مستودع GitHub (owner/repo): البرنامج بيدوّر فيه على التحديثات (.github/workflows/release.yml بينشر عليه).
+         لازم يكون Public عشان الأجهزة تقدر تنزّل منه من غير تسجيل دخول. -->
+    <PcGitHubRepo>waelMowis/AjyalPcCare</PcGitHubRepo>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(PcGitHubRepo)' != ''">
+    <!-- بيتكتب جوه البرنامج: UpdateChecker.BuiltInRepo -->
+    <AssemblyMetadata Include="UpdateRepo" Value="$(PcGitHubRepo)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="pccare.settings.json" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Update="Fonts\*.ttf" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Update="Fonts\*.otf" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+  <!-- =====================================================================
+       أرقام الإصدارات — مصدر واحد بس: GitHub (نفس نظام «مسار»)
+         • النشر الرسمي (GitHub Actions ← release.yml): الإصدار = PcBaseVersion + رقم تشغيل النشر (1.0.1، 1.0.2 …)
+           ودي الإصدارات اللي الأجهزة بتتحدّث منها.
+         • النشر من Visual Studio (بروفايل Installer): مثبّت للتجربة على جهازك بس. رقمه PcBaseVersion.0 (أقل من
+           أي إصدار رسمي، فالبرنامج المتثبت منه بيعرض التحديث للإصدار الرسمي على طول)، واسمه فيه التاريخ والساعة:
+           PCCare-Setup-test-20261117-1130.exe
+       ===================================================================== -->
+  <Target Name="PcStampVersion" BeforeTargets="GetAssemblyVersion;GenerateAssemblyInfo;Publish" Condition="'$(PcRelease)' == 'true'">
+    <PropertyGroup>
+      <PcOfficial Condition="'$(PcBuildNumberOverride)' != ''">true</PcOfficial>
+      <PcBuildNumber Condition="'$(PcOfficial)' == 'true'">$(PcBuildNumberOverride)</PcBuildNumber>
+      <PcBuildNumber Condition="'$(PcOfficial)' != 'true'">0</PcBuildNumber>
+      <PcStamp>$([System.DateTime]::Now.ToString("yyyyMMdd-HHmm"))</PcStamp>
+      <Version>$(PcBaseVersion).$(PcBuildNumber)</Version>
+      <AssemblyVersion>$(Version).0</AssemblyVersion>
+      <FileVersion>$(Version).0</FileVersion>
+      <InformationalVersion Condition="'$(PcOfficial)' == 'true'">$(Version)</InformationalVersion>
+      <InformationalVersion Condition="'$(PcOfficial)' != 'true'">$(Version)-test.$(PcStamp)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="PcRelease" AfterTargets="Publish" DependsOnTargets="PcStampVersion" Condition="'$(PcRelease)' == 'true'">
+    <PropertyGroup>
+      <PcStaging>$([System.IO.Path]::GetFullPath('$(PublishDir)').TrimEnd('\').TrimEnd('/'))</PcStaging>
+      <PcIss>$(PcRoot)\installer\PCCare.iss</PcIss>
+      <PcSetupName Condition="'$(PcOfficial)' == 'true'">PCCare-Setup-$(Version)</PcSetupName>
+      <PcSetupName Condition="'$(PcOfficial)' != 'true'">PCCare-Setup-test-$(PcStamp)</PcSetupName>
+      <!-- Releases فيه ملف واحد بس: آخر نسخة رسمية (publish.cmd بيحطها). نسخ التجربة المحلية في Releases\test -->
+      <PcSetupDir Condition="'$(PcOfficial)' == 'true'">$(PcReleasesRoot)</PcSetupDir>
+      <PcSetupDir Condition="'$(PcOfficial)' != 'true'">$(PcReleasesRoot)\test</PcSetupDir>
+
+      <!-- مكان ISCC.exe: ممكن تحدده بنفسك بـ -p:PcIscc=... -->
+      <PcIscc Condition="'$(PcIscc)' == '' and Exists('$(MSBuildProgramFiles32)\Inno Setup 6\ISCC.exe')">$(MSBuildProgramFiles32)\Inno Setup 6\ISCC.exe</PcIscc>
+      <PcIscc Condition="'$(PcIscc)' == '' and Exists('$(ProgramW6432)\Inno Setup 6\ISCC.exe')">$(ProgramW6432)\Inno Setup 6\ISCC.exe</PcIscc>
+      <PcIscc Condition="'$(PcIscc)' == '' and Exists('$(LOCALAPPDATA)\Programs\Inno Setup 6\ISCC.exe')">$(LOCALAPPDATA)\Programs\Inno Setup 6\ISCC.exe</PcIscc>
+      <PcIscc Condition="'$(PcIscc)' == '' and Exists('$(ProgramW6432)\Inno Setup 7\ISCC.exe')">$(ProgramW6432)\Inno Setup 7\ISCC.exe</PcIscc>
+      <PcIscc Condition="'$(PcIscc)' == '' and Exists('$(MSBuildProgramFiles32)\Inno Setup 7\ISCC.exe')">$(MSBuildProgramFiles32)\Inno Setup 7\ISCC.exe</PcIscc>
+    </PropertyGroup>
+
+    <Error Condition="'$(PcIscc)' == ''"
+           Text="Inno Setup مش متثبت، فالمثبّت ماتعملش. نزّله من jrsoftware.org أو: winget install JRSoftware.InnoSetup" />
+
+    <!-- اللوج والتقارير وسجل التغييرات (لو حد شغّل البرنامج من فولدر النشر) مايدخلوش المثبّت أبدًا -->
+    <RemoveDir Directories="$(PcStaging)\logs;$(PcStaging)\reports" />
+    <Delete Files="$(PcStaging)\changes.json" />
+
+    <MakeDir Directories="$(PcSetupDir)" />
+    <Exec Command="&quot;$(PcIscc)&quot; /Q &quot;/DSourceDir=$(PcStaging)&quot; &quot;/DAppVersion=$(Version)&quot; &quot;/O$(PcSetupDir)&quot; &quot;/F$(PcSetupName)&quot; &quot;$(PcIss)&quot;" />
+
+    <RemoveDir Directories="$(PcStaging)" />
+    <Message Importance="high" Text="✓ المثبّت جاهز: $(PcSetupDir)\$(PcSetupName).exe" />
+  </Target>
+
+  <!-- =====================================================================
+       النشر على GitHub من Visual Studio (بروفايل GitHub): نفس publish.cmd بالظبط —
+       Push ← GitHub يبني وينشر ← آخر مثبّت ينزل في Releases (ملف واحد بس).
+       مفيش بناء محلي للمثبّت هنا: الإصدار الرسمي دايمًا من GitHub عشان رقمه يبقى هو اللي الأجهزة بتتحدّث منه.
+       ===================================================================== -->
+  <Target Name="PcGitHubPublish" AfterTargets="Publish" Condition="'$(PcGitHubPublish)' == 'true'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(PcRoot)\tools\publish-release.ps1&quot; -NoPrompt"
+          WorkingDirectory="$(PcRoot)" />
+  </Target>
+
+</Project>

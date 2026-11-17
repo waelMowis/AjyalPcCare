@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="AjyalPcCare.PCCare"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          ليه highestAvailable مش requireAdministrator؟
+          requireAdministrator بيمنع البرنامج يفتح أصلًا لو المستخدم عادي (أو رفض UAC)،
+          وده بيتعارض مع شرط "وضع قراءة فقط لو اتفتحت من غير صلاحيات".
+          highestAvailable:
+            - حساب Admin  → يطلب UAC ويشتغل بصلاحيات كاملة (نفس سلوك requireAdministrator).
+            - حساب عادي (طالب في المعمل) → يفتح بدون UAC في وضع القراءة فقط.
+          والمهمة المجدولة بتشتغل بحساب SYSTEM أصلًا فمش بتتأثر.
+        -->
+        <requestedExecutionLevel level="highestAvailable" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+    </application>
+  </compatibility>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+</assembly>

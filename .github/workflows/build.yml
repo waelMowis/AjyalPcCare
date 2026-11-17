@@ -1,0 +1,40 @@
+# فحص إن المشروع بيتبني وبيفتح مع كل push (على ويندوز حقيقي).
+# النشر الرسمي (المثبّت + Release) في release.yml.
+name: build
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build PCCare/PCCare.csproj -c Release -o smoke
+
+      - name: فحص إن الواجهة بتفتح وكل الصفحات بتتبني (smoke test)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath smoke\PCCare.exe -ArgumentList '--smoke-test' -PassThru -RedirectStandardError smoke-err.txt -RedirectStandardOutput smoke-out.txt
+          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'البرنامج علّق في فحص الفتح' }
+          Get-Content smoke-out.txt, smoke-err.txt -ErrorAction SilentlyContinue
+          Get-ChildItem smoke\logs -ErrorAction SilentlyContinue | Get-Content -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "البرنامج وقع وهو بيفتح (exit $($p.ExitCode))" }
+
+      - name: فحص الوضع الصامت (تنظيف Temp + تقرير)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath smoke\PCCare.exe -ArgumentList '/silent','/clean:temp','/report:silent-report' -PassThru -Wait
+          Get-ChildItem smoke\logs -ErrorAction SilentlyContinue | Get-Content -Tail 30 -ErrorAction SilentlyContinue
+          if ($p.ExitCode -gt 1) { throw "الوضع الصامت فشل (exit $($p.ExitCode))" }
+          if (-not (Get-ChildItem silent-report -Filter *.html -ErrorAction SilentlyContinue)) { throw 'تقرير HTML ماتعملش' }
+          Write-Host "✓ الوضع الصامت اشتغل وطلّع تقرير (exit $($p.ExitCode))"
